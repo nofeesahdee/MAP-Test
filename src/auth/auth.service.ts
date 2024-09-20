@@ -8,7 +8,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import { LoginDto, RegisterDto } from './auth.dto';
 import { User } from './user.model';
 import * as bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { ConfigService } from '@nestjs/config';
 import { Config, IConfig } from 'src/config';
 
@@ -31,7 +31,6 @@ export class AuthService {
 
     private generateJwt(data: JwtPayload) {
         const jwtConfig = this.config.get(Config.Jwt, { infer: true });
-
         const token = jwt.sign(data, jwtConfig.secret, {
             expiresIn: '1d',
         });
@@ -39,22 +38,8 @@ export class AuthService {
         return token;
     }
 
-    verifyToken(token: string) {
-        const jwtConfig = this.config.get(Config.Jwt, { infer: true });
-
-        try {
-            const payload = jwt.verify(
-                token,
-                jwtConfig.secret,
-            ) as unknown as JwtPayload;
-
-            return payload;
-        } catch (error) {
-            throw new UnauthorizedException('Not authorized!');
-        }
-    }
-
-    async register(data: RegisterDto) {
+    async register(data: RegisterDto): Promise<{ access_token: string }> {
+        // check for existing user
         const existingUser = await this.user.findOne({
             where: { email: data.email },
         });
@@ -73,11 +58,11 @@ export class AuthService {
         });
 
         const token = this.generateJwt({ sub: user.id });
-
-        return { token };
+        return { access_token: token };
     }
 
-    async login(data: LoginDto) {
+
+    async login(data: LoginDto): Promise<{ access_token: string }> {
         // check db for email
         const user = await this.user.findOne({
             where: { email: data.email },
@@ -93,11 +78,9 @@ export class AuthService {
         if (!passwordMatch) {
             throw new UnauthorizedException('Incorrect Password');
         }
-        // generate jwt
-        const token = this.generateJwt({ sub: user.id });
 
-        // return token
-        return { token };
+        const token = this.generateJwt({ sub: user.id });
+        return { access_token: token };
     }
 
 }
